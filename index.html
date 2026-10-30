@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gravity Lab v0.8.2 — Piquinho Software</title>
+<style>
+:root{color-scheme:dark;font:13px system-ui,Segoe UI,sans-serif;background:#050b16;color:#e7f4ff;--edge:#244363;--cyan:#62d9ff;--panel:#0c1b30eF}*{box-sizing:border-box}
+body{margin:0;overflow:hidden}button,select,input{font:inherit}button,select{background:#122944;color:#e8f4ff;border:1px solid #315675;border-radius:8px;padding:8px 10px;cursor:pointer}button:hover{background:#214467}button:focus-visible,input:focus-visible{outline:2px solid #64d7ff}
+button.primary,.selected{background:#13638d;border-color:#42b7ee}header{height:54px;display:flex;align-items:center;gap:10px;padding:6px 14px;background:#0c1a2e;border-bottom:1px solid var(--edge)}
+.brand{font-weight:850;letter-spacing:1.6px;color:#a4e7ff;font-size:17px;white-space:nowrap}.badge{font-size:10px;color:#a2b7d0;border:1px solid #365572;padding:4px 6px;border-radius:5px}.spacer{flex:1}
+.toolbar{display:flex;align-items:center;gap:7px}.time{color:#a8c7e4;white-space:nowrap;font-variant-numeric:tabular-nums}
+main{height:calc(100dvh - 84px);display:grid;grid-template-columns:minmax(0,1fr) 300px}
+#stage{position:relative;overflow:hidden;background:radial-gradient(ellipse at 52% 45%,#132543 0,#060e1d 64%,#040812 100%);touch-action:none}
+#mainCanvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab}#mainCanvas:active{cursor:grabbing}
+#overlay{position:absolute;top:14px;left:15px;pointer-events:none;background:#081629bc;padding:10px 12px;border:1px solid #294966;border-radius:10px}
+#overlay b{color:#a6e7ff;letter-spacing:1px}#overlay small{display:block;color:#94acc6;margin-top:4px}
+#miniStack{position:absolute;right:12px;bottom:12px;display:flex;gap:9px;align-items:flex-end;pointer-events:none}
+.mini{width:175px;height:126px;position:relative;background:#091629ec;border:1px solid #345d80;border-radius:10px;overflow:hidden;box-shadow:0 6px 24px #0009;pointer-events:auto}
+.mini canvas{width:100%;height:100%;display:block;cursor:pointer}.mini button{position:absolute;top:4px;right:5px;font-size:11px;padding:2px 6px}
+.mini .label{position:absolute;left:7px;top:6px;color:#c4eaff;font-size:11px;pointer-events:none}
+#side{background:var(--panel);border-left:1px solid var(--edge);display:flex;flex-direction:column;min-width:0}
+.tabs{display:flex;padding:10px 10px 0;gap:5px}.tabs button{flex:1;padding:8px 2px;font-size:11px;min-width:0}
+#panels{padding:14px;overflow:auto;flex:1}.panel{display:none}.panel.active{display:block}
+h2{margin:0 0 12px;font-size:14px;letter-spacing:.6px;color:#aee9ff}h3{font-size:12px;color:#b6d6f1;margin:18px 0 6px}
+.field{margin:13px 0}.field label{display:flex;justify-content:space-between;gap:10px;color:#b9d0e6;margin-bottom:5px}.field output{color:#7be3ff;font-variant-numeric:tabular-nums;font-weight:650}
+input[type=range]{width:100%;accent-color:#46c5ff;cursor:pointer}.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.help{color:#91a9c2;font-size:12px;line-height:1.5}.notice{padding:10px;border:1px solid #345576;border-radius:9px;background:#122742;color:#a9d6ef}
+.check{display:flex;align-items:center;gap:8px;margin:11px 0;color:#c8d7e9}.check input{accent-color:#4ccaff}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metric{background:#0a172a;border:1px solid #203c59;border-radius:8px;padding:9px;min-width:0}
+.metric span{display:block;color:#94adc5;font-size:11px}.metric strong{display:block;color:#85e2ff;font-size:15px;margin-top:5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+footer{height:30px;display:flex;gap:15px;align-items:center;padding:0 12px;background:#091626;border-top:1px solid var(--edge);color:#8eaac5;font-size:11px;white-space:nowrap;overflow:hidden}
+#side.hidden{display:none}main.collapsed{grid-template-columns:minmax(0,1fr)}#openSide{position:absolute;right:12px;top:12px;z-index:3;display:none}main.collapsed #openSide{display:block}
+#orientation{display:none;position:fixed;inset:0;z-index:10;background:#071426f2;align-items:center;justify-content:center;text-align:center;padding:28px;font-size:18px}
+@media(max-width:1000px){main{grid-template-columns:minmax(0,1fr) 255px}.mini{width:132px;height:98px}.brand{font-size:14px}.badge{display:none}}
+@media(max-height:480px){header{height:44px}main{height:calc(100dvh - 67px)}footer{height:23px}.mini{width:120px;height:82px}#panels{padding:9px}.tabs{padding:5px 5px 0}#overlay{padding:6px;font-size:11px}}
+@media(max-width:680px) and (orientation:portrait) and (hover:none) and (pointer:coarse){#orientation{display:flex}}
+
+/* v0.7: área de simulação integral e janelas contextuais */
+main,main.collapsed{display:block;position:relative;height:calc(100dvh - 84px)}
+#stage{position:absolute;inset:0}
+#side{position:absolute;left:12px;top:12px;z-index:5;width:355px;height:min(660px,calc(100% - 24px));min-width:275px;min-height:180px;max-width:calc(100% - 24px);max-height:calc(100% - 24px);border:1px solid #40617d;border-radius:13px;background:#0b1b30f2;box-shadow:0 15px 45px #0009;resize:both;overflow:hidden;backdrop-filter:blur(9px)}
+#side.docked{left:0!important;top:0!important;height:100%!important;max-height:100%;border-radius:0 12px 12px 0;resize:horizontal}
+#side.hidden{display:none}#sideHeader{height:34px;display:flex;align-items:center;gap:7px;padding:4px 7px 4px 12px;border-bottom:1px solid #294662;touch-action:none;cursor:move;user-select:none}
+#sideHeader strong{font-size:11px;color:#94dfff;letter-spacing:.8px;flex:1}#sideHeader button{padding:3px 8px;font-size:12px}
+#side.docked #sideHeader{cursor:default}#side.docked #floatSide{background:#175d85}
+#openSide{display:block;position:absolute;left:12px;top:12px;right:auto;z-index:4}#overlay{left:auto;right:15px;top:14px}
+#panels{padding:10px 12px;overscroll-behavior:contain}#side .tabs{padding:7px 8px 0;gap:3px}#side .tabs button{font-size:10px;padding:7px 1px}.field{margin:9px 0}.field label{margin-bottom:3px}
+#panel-launch{padding-bottom:3px}#panel-launch .help{margin:5px 0}#panel-launch details{border:1px solid #254761;border-radius:9px;margin:8px 0;background:#10233b80}
+#panel-launch summary{padding:9px 11px;cursor:pointer;color:#b9e7ff;font-weight:700;user-select:none}
+#panel-launch .detailBody{padding:0 10px 9px}#panel-launch .detailBody .field:first-child{margin-top:4px}
+#panel-launch input[type=number]{max-width:100%}#panel-launch .field input[type=range]{margin:0}
+#launchActions{position:sticky;bottom:-10px;z-index:2;padding:8px 4px 10px;margin:8px -4px -10px;background:#0b1b30;border-top:1px solid #32536e;display:flex;gap:7px}
+#launchActions button{flex:1;padding:9px 5px;white-space:nowrap}#launchFeedback{font-size:11px;margin:7px 0}
+#miniStack{position:absolute;inset:0;display:block;pointer-events:none}#miniStack .mini{position:absolute;width:170px;height:125px;right:12px;bottom:12px;resize:both;min-width:115px;min-height:83px;max-width:65%;max-height:60%;overflow:hidden;touch-action:none}
+#miniStack .mini:first-child{right:192px}#miniStack .mini canvas{height:calc(100% - 23px);margin-top:23px;touch-action:none}
+.mini .label{position:absolute;left:0;top:0;right:0;height:23px;padding:4px 25px 4px 8px;background:#19334c;cursor:move;touch-action:none;pointer-events:auto;user-select:none}
+.mini button{z-index:1}#miniRestore{position:absolute;right:12px;bottom:10px;z-index:3;display:none}
+#launchHint{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:3;display:none;background:#183a53ec;padding:10px 15px;border-radius:9px;border:1px solid #6dd8fa;pointer-events:none}
+#launchPreview{z-index:2}#sideHandle{display:none}
+@media(max-width:760px){#side{width:min(94vw,420px);left:3vw;top:auto;bottom:6px;height:min(58vh,400px);max-height:calc(100% - 8px);min-height:135px;resize:vertical}#side.docked{left:0!important;top:auto!important;bottom:0!important;width:100%!important;height:min(58vh,420px)!important;max-height:90%;border-radius:12px 12px 0 0;resize:vertical}#sideHeader{cursor:default}#overlay{right:7px;top:8px;padding:5px}#miniStack .mini{width:118px;height:90px;right:7px;bottom:7px}#miniStack .mini:first-child{right:132px}#miniStack .mini canvas{height:calc(100% - 22px);margin-top:22px}#miniStack .mini .label{font-size:9px}#launchActions{bottom:-10px}#openSide{left:7px;top:8px}}
+@media(max-height:480px){main,main.collapsed{height:calc(100dvh - 67px)}#side{height:calc(100% - 10px);top:5px;bottom:auto}#side.docked{height:100%!important}#sideHeader{height:29px}}
+.savedList{display:grid;gap:8px;margin-top:12px}.savedItem{border:1px solid #30516c;background:#10253d;border-radius:9px;padding:10px}.savedItem strong{display:block;color:#c4ecff}.savedItem small{display:block;color:#92b2cd;margin:4px 0}.savedItem .row{margin:7px 0 0}.savedItem button{padding:5px 7px;font-size:11px}
+#eventLog{max-height:170px;overflow:auto;white-space:pre-line}.tabs{flex-shrink:0}
+
+/* v0.8.2: informação contextual e marca compacta */
+.brandBy{display:block;font-size:9px;letter-spacing:.2px;font-weight:500;color:#8dbbd2;line-height:1.1}
+.infoTip{display:inline-flex;align-items:center;justify-content:center;position:relative;vertical-align:middle;width:18px;height:18px;margin:4px 2px 6px;border:1px solid #487797;border-radius:50%;background:#12314c;color:#b4eaff;font:700 11px system-ui;cursor:help;outline-offset:3px}
+.infoTip>.infoBubble{display:none;position:absolute;left:0;top:calc(100% + 7px);width:min(300px,75vw);padding:10px 12px;border:1px solid #5482a3;border-radius:9px;background:#122a42;color:#d5e9f9;font:12px/1.5 system-ui;text-align:left;box-shadow:0 10px 25px #000a;z-index:15;pointer-events:auto}
+.infoTip:hover>.infoBubble,.infoTip:focus>.infoBubble,.infoTip:focus-within>.infoBubble,.infoTip.open>.infoBubble{display:block}
+#panels{isolation:isolate}#side{overflow:visible}#panels{min-height:0}#side .tabs{overflow-x:auto;scrollbar-width:thin}#side .tabs button{white-space:nowrap;padding:7px 4px}
+@media(max-width:680px){.brandBy{font-size:8px}.brand{font-size:12px}}
+</style></head><body>
+<div id="orientation"><div>↻<br><br><b>Roda o telemóvel</b><p>O Gravity Lab foi desenhado para utilização horizontal.</p></div></div>
+<header><div class="brand">GRAVITY LAB<small class="brandBy">Piquinho Software</small></div><span class="badge">v0.8.2 · Sistemas astronómicos</span><span class="spacer"></span>
+<div class="toolbar"><span class="time" id="clock">Dia 0,00</span><button id="play" class="primary" title="Iniciar ou pausar">▶</button><button id="reset" title="Reiniciar">↺</button>
+<select id="speed" title="Tempo simulado por segundo real"><option value="3600">1 h/s</option><option value="21600" selected>6 h/s</option><option value="86400">1 d/s</option><option value="259200">3 d/s</option></select>
+<button id="snapshotJpg" title="Guardar imagem JPG da simulação">▣ JPG</button><button id="toggleSide" title="Recolher painel">☷</button></div></header>
+<main id="layout"><section id="stage"><canvas id="mainCanvas"></canvas>
+<div id="overlay"><b id="viewTitle">VISTA 3D</b><small>Terra · Lua · baricentro</small><small id="modeLabel">Condições iniciais</small></div>
+<button id="openSide">☷ Controlos</button>
+<div id="launchHint">Clica para posicionar · arrasta para definir a velocidade</div><button id="miniRestore">Mostrar vistas</button><div id="launchPreview" style="display:none;position:absolute;left:15px;bottom:15px;background:#102b43dd;border:1px solid #59bce3;border-radius:8px;padding:9px;pointer-events:none">Clica no mapa para escolher a posição</div><div id="miniStack"><div class="mini" data-mini="xy"><canvas id="miniXY" title="Trocar para vista superior"></canvas><span class="label">SUPERIOR XY</span><button data-close="xy" title="Ocultar miniatura">×</button></div>
+<div class="mini" data-mini="xz"><canvas id="miniXZ" title="Trocar para vista lateral"></canvas><span class="label">LATERAL XZ</span><button data-close="xz" title="Ocultar miniatura">×</button></div></div>
+</section>
+<aside id="side" class="docked"><div id="sideHeader"><strong>CONTROLOS</strong><button id="floatSide" title="Desprender ou encaixar painel">⧉</button><button id="minSide" title="Recolher painel">−</button></div><nav class="tabs"><button class="selected" data-tab="system">Física</button><button data-tab="launch">Lançar</button><button data-tab="visual">Visual</button><button data-tab="science">Métricas</button><button data-tab="systems">Sistemas</button><button data-tab="library">Guardar</button></nav>
+<div id="panels">
+<section class="panel active" id="panel-system"><h2>PARÂMETROS ORBITAIS</h2>
+<div class="row"><button id="initialMode" class="selected">Condições iniciais</button><button id="liveMode">Em directo</button></div>
+<p class="help" id="editHelp">As alterações preparam uma nova experiência, sem avançar o tempo.</p>
+<label class="check"><input type="checkbox" id="autoOrbit" checked>Velocidade circular automática</label>
+<div class="field"><label for="earthMass">Massa da Terra <output id="earthMassValue"></output></label><input id="earthMass" type="range" min="-1" max="2" step=".01" value="0"></div>
+<div class="field"><label for="moonMass">Massa da Lua <output id="moonMassValue"></output></label><input id="moonMass" type="range" min="-2" max="2" step=".01" value="0"></div>
+<div class="field"><label for="distance">Distância inicial <output id="distanceValue"></output></label><input id="distance" type="range" min="50000" max="2000000" step="1000" value="384400"></div>
+<div class="field"><label for="orbitalSpeed">Velocidade relativa <output id="orbitalSpeedValue"></output></label><input id="orbitalSpeed" type="range" min="0" max="5" step=".01" value="1" disabled></div>
+<div class="field"><label for="grav">Constante G <output id="gravValue"></output></label><input id="grav" type="range" min="-1" max="1" step=".01" value="0"></div>
+<div class="row"><button id="defaults">Repor valores</button><button id="step">+ 1 hora</button></div>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Massas e G: multiplicadores logarítmicos. Velocidade manual: multiplicador da velocidade circular calculada para as condições actuais.</div></div>
+</section>
+<section class="panel" id="panel-launch"><h2>LANÇAMENTO DE CORPOS</h2>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Escolhe um cenário ou configura manualmente o lançamento. Até 32 corpos simultâneos.</div></div>
+<details open><summary>01 · Objecto e cenário</summary><div class="detailBody"><div class="field"><label for="scenario">Cenário rápido</label><select id="scenario" style="width:100%">
+<option value="">Personalizado</option>
+<option value="orbit">Órbita terrestre circular (satélite)</option>
+<option value="flyby">Passagem próxima da Terra</option>
+<option value="impact">Impacto na Terra (asteróide)</option>
+<option value="escape">Trajectória de escape</option>
+<option value="lunar">Encontro com a Lua</option>
+<option value="perturb">Perturbação lunar (corpo massivo)</option>
+</select></div>
+<p class="help" id="scenarioHelp">Escolhe um cenário para preencher os parâmetros de lançamento.</p>
+<div class="field"><label for="catalog">Objecto</label><select id="catalog" style="width:100%"></select></div>
+<div class="field"><label for="launchMass">Massa (kg)</label><input id="launchMass" type="number" min="1" step="any" style="width:100%;background:#10243b;color:white;border:1px solid #426083;padding:8px"></div>
+<div class="field"><label for="launchRadius">Raio físico (km)</label><input id="launchRadius" type="number" min=".001" step="any" style="width:100%;background:#10243b;color:white;border:1px solid #426083;padding:8px"></div>
+</div></details><details open><summary>02 · Posição</summary><div class="detailBody"><div class="field"><label for="launchDistance">Distância à Terra <output id="launchDistanceValue"></output></label><input id="launchDistance" type="range" min="10000" max="1500000" step="1000" value="550000"></div>
+<div class="field"><label for="launchAngle">Direcção da posição <output id="launchAngleValue"></output></label><input id="launchAngle" type="range" min="-180" max="180" value="45"></div>
+</div></details><details><summary>03 · Velocidade e direcção</summary><div class="detailBody"><div class="field"><label for="launchSpeed">Velocidade inicial <output id="launchSpeedValue"></output></label><input id="launchSpeed" type="range" min="0" max="20" step=".1" value="1"></div>
+<div class="field"><label for="launchHeading">Direcção da velocidade <output id="launchHeadingValue"></output></label><input id="launchHeading" type="range" min="-180" max="180" value="135"></div>
+<div class="field"><label for="launchIncline">Inclinação vertical <output id="launchInclineValue"></output></label><input id="launchIncline" type="range" min="-90" max="90" value="0"></div>
+</div></details><div id="launchActions"><button id="placeOnMap">Marcar posição na vista</button><button id="launchBody" class="primary">➤ Lançar</button></div>
+<p id="launchFeedback" class="notice">Pronto para lançamento.</p>
+<h3>Corpos activos</h3><div id="bodyList" class="help"></div>
+</section>
+<section class="panel" id="panel-visual"><h2>VISUALIZAÇÃO</h2>
+<div class="row"><button data-view="3d">Vista 3D</button><button data-view="xy">Vista XY</button><button data-view="xz">Vista XZ</button></div>
+<div class="field"><label for="zoom">Zoom <output id="zoomValue">1,0×</output></label><input id="zoom" type="range" min=".35" max="5" value="1" step=".05"></div>
+<label class="check"><input type="checkbox" id="showTrails" checked>Mostrar trajectórias</label>
+<label class="check"><input type="checkbox" id="showVectors">Vectores de velocidade</label>
+<label class="check"><input type="checkbox" id="showGrid" checked>Grelha de referência</label>
+<div class="field"><label for="sizeMode">Escala visual dos corpos</label><select id="sizeMode" style="width:100%"><option value="visible">Visível (recomendada)</option><option value="real">Raio físico proporcional</option><option value="cinema">Cinematográfica</option></select></div>
+<div class="field"><label for="followBody">Seguir corpo</label><select id="followBody" style="width:100%"><option value="">Câmara livre</option></select></div>
+<label class="check"><input type="checkbox" id="realistic" checked>Texturas procedimentais</label>
+<label class="check"><input type="checkbox" id="showFx" checked>Efeitos visuais</label>
+<label class="check"><input type="checkbox" id="soundOn">Efeitos sonoros</label>
+<div class="field"><label for="volume">Volume <output id="volumeValue">35%</output></label><input type="range" id="volume" min="0" max="100" value="35"></div>
+<label class="check"><input type="checkbox" id="showMinis" checked>Miniaturas flutuantes</label>
+<button id="cameraReset">Repor câmara</button>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Na vista 3D, arrasta para rodar. Roda do rato ou pinça para zoom. Nas vistas planas, arrasta para deslocar.</div></div>
+</section>
+<section class="panel" id="panel-systems"><h2>SISTEMAS ASTRONÓMICOS</h2>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Configurações astronómicas com massas e raios de referência. As posições iniciais usam órbitas circulares aproximadas — não são efemérides JPL para uma data específica.</div></div>
+<div class="field"><label for="preset">Sistema</label><select id="preset" style="width:100%">
+<option value="earthmoon">Terra e Lua</option><option value="equal">Duas massas iguais (baricentro)</option>
+<option value="sunearthmoon">Sol, Terra e Lua</option><option value="inner">Sistema Solar interior</option>
+<option value="solar">Sistema Solar completo</option><option value="jupiter">Júpiter e luas galileanas</option>
+<option value="saturn">Saturno e luas principais</option><option value="pluto">Plutão e Caronte</option>
+<option value="sej">Sol, Terra e Júpiter</option></select></div>
+<div class="row"><button id="loadPreset" class="primary">Aplicar sistema</button><button id="fitSystem">Enquadrar tudo</button></div>
+<label class="check"><input type="checkbox" id="showBary" checked>Mostrar baricentro</label>
+<label class="check"><input type="checkbox" id="autoFrame" checked>Enquadramento automático ao carregar</label>
+<div class="notice" id="systemInfo">Terra e Lua. Selecciona outro sistema para o carregar.</div>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">O limite é de 32 corpos. A precisão é educativa: integração newtoniana de massas pontuais, colisões esféricas e sem achatamento planetário.</div></div>
+</section><section class="panel" id="panel-library"><h2>BIBLIOTECA DE EXPERIÊNCIAS</h2>
+<div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Guarda as condições iniciais e os acontecimentos para repetir uma experiência; ou guarda um ponto de controlo para continuar depois.</div></div>
+<div class="field"><label for="saveName">Nome da experiência</label><input id="saveName" type="text" maxlength="90" placeholder="Ex.: Passagem rasante" style="width:100%;padding:9px;background:#10243b;color:white;border:1px solid #426083;border-radius:7px"></div>
+<div class="row"><button id="saveExperiment" class="primary">Guardar experiência</button><button id="saveCheckpoint">Guardar estado actual</button></div>
+<div class="row"><button id="exportExperiments">Exportar JSON</button><button id="importExperiments">Importar JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div>
+<p class="notice" id="libraryStatus">As experiências são guardadas neste browser (IndexedDB).</p>
+<div id="savedList" class="savedList"></div>
+<h3>Histórico desta execução</h3><div id="eventLog" class="help">Sem intervenções.</div></section>
+<section class="panel" id="panel-science"><h2>INSTRUMENTOS</h2><div class="metrics">
+<div class="metric"><span>Distância</span><strong id="mDistance">—</strong></div><div class="metric"><span>Velocidade relativa</span><strong id="mVelocity">—</strong></div>
+<div class="metric"><span>Período circular teórico</span><strong id="mPeriod">—</strong></div><div class="metric"><span>Passos numéricos</span><strong id="mSteps">—</strong></div>
+<div class="metric"><span>Deriva de energia</span><strong id="mEnergy">—</strong></div><div class="metric"><span>Deriva de momento angular</span><strong id="mAngular">—</strong></div>
+<div class="metric"><span>Deslocação do baricentro</span><strong id="mBary">—</strong></div><div class="metric"><span>Tempo simulado</span><strong id="mTime">—</strong></div>
+</div><div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">As referências de conservação são actualizadas após intervenções em directo. Uma alteração de parâmetros não é um erro do integrador.</div></div>
+<h3>Precisão</h3><div class="field"><label for="dt">Passo físico máximo <output id="dtValue">300 s</output></label><input id="dt" type="range" min="30" max="900" step="30" value="300"></div>
+<div class="infoTip" tabindex="0" role="note" aria-label="Notas de precisão"><span aria-hidden="true">i</span><div class="infoBubble">Sistemas astronómicos com órbitas iniciais aproximadas. As texturas são ilustrações, não mapas fotográficos NASA. Os indicadores de energia são redefinidos após impactos e intervenções.</div></div>
+</section></div></aside></main>
+<div id="impactDialog" style="display:none;position:fixed;inset:0;background:#020712cc;z-index:8;align-items:center;justify-content:center">
+<div style="width:min(430px,90vw);padding:22px;border:1px solid #e3a765;border-radius:14px;background:#13263d">
+<h2 style="color:#ffc68b">IMPACTO DETECTADO</h2><p id="impactInfo"></p><div class="infoTip" tabindex="0" role="note" aria-label="Informação adicional"><span aria-hidden="true">i</span><div class="infoBubble">Modelo: fusão perfeitamente inelástica, conservação de massa e momento linear. O raio resulta da soma dos volumes.</div></div>
+<div class="row"><button id="confirmMerge" class="primary">Fundir e continuar</button><button id="impactReset">Reiniciar</button></div>
+<label class="check"><input type="checkbox" id="autoMerge">Fusão automática nos próximos impactos</label></div></div>
+<footer><span id="status">● Pausado</span><span>Canvas 3D projectado · física newtoniana</span><span>Piquinho Software · Craft with Altitude. Built with Joy.</span></footer>
+<script>
+"use strict";
+document.addEventListener("click",e=>{
+ const tip=e.target.closest(".infoTip");
+ document.querySelectorAll(".infoTip.open").forEach(x=>{if(x!==tip)x.classList.remove("open")});
+ if(tip)tip.classList.toggle("open");
+});
+const G0=6.67430e-11, DAY=86400, ME=5.972e24, MM=7.342e22, R0=384400e3;
+const $=id=>document.getElementById(id),add=(a,b)=>a.map((x,i)=>x+b[i]),sub=(a,b)=>a.map((x,i)=>x-b[i]),mul=(a,s)=>a.map(x=>x*s),norm=a=>Math.hypot(...a);
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const format=(n,d=2)=>n.toLocaleString("pt-PT",{minimumFractionDigits:d,maximumFractionDigits:d});
+let bodies=[],G=G0,time=0,steps=0,baseline,trails=[],playing=false,last=null,carry=0,editMode="live",view="3d";
+let collisionMode="pause", pendingImpact=null, placing=false, launchPosition=null, bodySeq=0;
+let fx=[],audioContext=null,launchDrag=null;
+let experimentStart=null,history=[],replay=null,followId="",lastSavedNames=[];
+let activeSystem="earthmoon",systemBodies=null,viewScale=1,referenceCenter=[0,0,0];
+const clone=v=>JSON.parse(JSON.stringify(v));
+let yaw=-.65,pitch=.75,zoom=1,pan=[0,0],lastTrail=0;
+const settings={earthMass:1,moonMass:1,distance:R0,grav:1,orbitalSpeed:1,autoOrbit:true};
+function circularSpeed(){return Math.sqrt(G0*settings.grav*(ME*settings.earthMass+MM*settings.moonMass)/settings.distance)}
+function initialEarthMoon(){
+ const m1=ME*settings.earthMass,m2=MM*settings.moonMass,total=m1+m2,r=settings.distance,v=circularSpeed()*settings.orbitalSpeed;
+ return [{id:"terra",m:m1,r:6371e3,p:[-r*m2/total,0,0],v:[0,-v*m2/total,0]},
+ {id:"lua",m:m2,r:1737e3,p:[r*m1/total,0,0],v:[0,v*m1/total,0]}];
+}
+// Physical masses/radii and approximate mean orbital distances (SI).
+// Circular initial conditions are intentionally NOT NASA ephemerides.
+const AU=149597870700, MS=1.98847e30;
+const celestial={
+ sol:[MS,695700e3],mercurio:[3.3011e23,2439.7e3],venus:[4.8675e24,6051.8e3],terra:[ME,6371e3],lua:[MM,1737.4e3],
+ marte:[6.4171e23,3389.5e3],jupiter:[1.89813e27,69911e3],saturno:[5.6834e26,58232e3],urano:[8.6810e25,25362e3],neptuno:[1.02413e26,24622e3],
+ io:[8.9319e22,1821.6e3],europa:[4.7998e22,1560.8e3],ganimedes:[1.4819e23,2634.1e3],calisto:[1.0759e23,2410.3e3],
+ tita:[1.3452e23,2574.7e3],reia:[2.3065e21,763.8e3],japeto:[1.8056e21,734.5e3],dione:[1.0955e21,561.4e3],tetis:[6.1745e20,531.1e3],encelado:[1.0802e20,252.1e3],
+ plutao:[1.303e22,1188.3e3],caronte:[1.586e21,606e3]
+};
+function celestialBody(id,p=[0,0,0],v=[0,0,0]){const [m,r]=celestial[id];return {id,m,r,p:[...p],v:[...v],kind: id==="jupiter"?17:undefined}}
+function satellite(primary,id,distance,phase=0,inclination=0){
+ const speed=Math.sqrt(G0*(primary.m+celestial[id][0])/distance),c=Math.cos(phase),si=Math.sin(phase),inc=Math.PI*inclination/180;
+ return celestialBody(id,add(primary.p,[distance*c,distance*si*Math.cos(inc),distance*si*Math.sin(inc)]),
+ add(primary.v,[-speed*si,speed*c*Math.cos(inc),speed*c*Math.sin(inc)]));
+}
+function recenterMomentum(bs){
+ const mass=bs.reduce((sum,b)=>sum+b.m,0);
+ const com=bs.reduce((acc,b)=>add(acc,mul(b.p,b.m)),[0,0,0]).map(x=>x/mass);
+ const vel=bs.reduce((acc,b)=>add(acc,mul(b.v,b.m)),[0,0,0]).map(x=>x/mass);
+ bs.forEach(b=>{b.p=sub(b.p,com);b.v=sub(b.v,vel)});return bs;
+}
+function makeSystem(id){
+ if(id==="earthmoon")return initialEarthMoon();
+ if(id==="equal"){
+  const m=ME,r=R0,v=Math.sqrt(G0*(2*m)/r);
+  return [{id:"terra",m,r:6371e3,p:[-r/2,0,0],v:[0,-v/2,0]},
+          {id:"lua",m,r:1737e3,p:[r/2,0,0],v:[0,v/2,0]}];
+ }
+ if(id==="pluto"){
+  const p=celestialBody("plutao"),c=satellite(p,"caronte",19596e3,.8,0);return recenterMomentum([p,c]);
+ }
+ if(id==="jupiter"||id==="saturn"){
+  const p=celestialBody(id==="saturn"?"saturno":id),defs=id==="jupiter"?[["io",421700e3,.1,.04],["europa",671100e3,1.7,.47],["ganimedes",1070400e3,3.3,.2],["calisto",1882700e3,4.8,.28]]:
+  [["encelado",238000e3,.4,0],["tetis",294600e3,1.5,1.1],["dione",377400e3,2.4,.02],["reia",527100e3,3.5,.35],["tita",1221870e3,4.2,.33],["japeto",3560820e3,5.3,15.5]];
+  return recenterMomentum([p,...defs.map(([name,r,phase,inc])=>satellite(p,name,r,phase,inc))]);
+ }
+ const sun=celestialBody("sol"),defs=[
+ ["mercurio",.3871,.2,7],["venus",.7233,1.8,3.4],["terra",1,3.1,0],["marte",1.5237,4.4,1.85],
+ ["jupiter",5.2044,2.3,1.3],["saturno",9.5826,5.1,2.5],["urano",19.2184,1.2,.77],["neptuno",30.11,3.8,1.77]];
+ const names=id==="sunearthmoon"?["terra"]:id==="inner"?["mercurio","venus","terra","marte"]:id==="sej"?["terra","jupiter"]:defs.map(x=>x[0]);
+ const planets=defs.filter(x=>names.includes(x[0])).map(([name,a,phase,inc])=>satellite(sun,name,a*AU,phase,inc));
+ const earth=planets.find(b=>b.id==="terra");
+ if(earth&&id!=="sej"&&id!=="solar")planets.push(satellite(earth,"lua",384400e3,.65,5.14));
+ if(earth&&id==="solar")planets.push(satellite(earth,"lua",384400e3,.65,5.14));
+ return recenterMomentum([sun,...planets]);
+}
+function fitToSystem(){
+ const center=diagnostics(bodies).bary;
+ let far=0;for(const b of bodies)far=Math.max(far,norm(sub(b.p,center))+b.r);
+ // main render scale = min(w,h)/(R0*2.75) * zoom * viewScale
+ viewScale=Math.min(1e5,Math.max(1e-7,R0*1.06/Math.max(far,1)));
+ zoom=1;$("zoom").value=1;pan=[0,0];syncControls();drawAll();
+}
+function loadSystem(id){
+ activeSystem=id;systemBodies=id==="earthmoon"?null:makeSystem(id);
+ editMode=id==="earthmoon"?"live":"live";
+ $("systemInfo").textContent="Sistema carregado: "+$("preset").selectedOptions[0].textContent+". Órbitas iniciais circulares aproximadas, não efemérides de uma data.";
+ reset();if($("autoFrame").checked)fitToSystem();
+ $("earthMass").disabled=$("moonMass").disabled=$("distance").disabled=$("orbitalSpeed").disabled=id!=="earthmoon";
+ $("autoOrbit").disabled=id!=="earthmoon";
+ syncControls();
+}
+function snapshotJpg(){
+ // Export only the scene; no UI panels, in the current camera perspective.
+ const canvas=$("mainCanvas"),out=document.createElement("canvas");
+ out.width=Math.max(1920,canvas.width);out.height=Math.max(1080,canvas.height);
+ const ctx=out.getContext("2d");ctx.fillStyle="#061020";ctx.fillRect(0,0,out.width,out.height);
+ const factor=Math.min(out.width/canvas.width,out.height/canvas.height);
+ const width=canvas.width*factor,height=canvas.height*factor;
+ ctx.drawImage(canvas,(out.width-width)/2,(out.height-height)/2,width,height);
+ const filename="GravityLab_"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+".jpg";
+ out.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)},"image/jpeg",.93);
+}
+
+function initial(){return systemBodies?clone(systemBodies):initialEarthMoon()}
+function accelerations(bs){
+ const a=bs.map(()=>[0,0,0]);
+ for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){
+  const d=sub(bs[j].p,bs[i].p),r=norm(d);if(r===0||!Number.isFinite(r))throw Error("Distância inválida");
+  const q=G/(r*r*r);a[i]=add(a[i],mul(d,q*bs[j].m));a[j]=sub(a[j],mul(d,q*bs[i].m));
+ }return a;
+}
+function verlet(bs,dt){
+ const a=accelerations(bs);
+ for(let i=0;i<bs.length;i++)bs[i].p=add(add(bs[i].p,mul(bs[i].v,dt)),mul(a[i],dt*dt/2));
+ const next=accelerations(bs);
+ for(let i=0;i<bs.length;i++)bs[i].v=add(bs[i].v,mul(add(a[i],next[i]),dt/2));
+}
+function diagnostics(bs){
+ let kinetic=0,potential=0,angular=[0,0,0],weighted=[0,0,0],mass=0;
+ for(let i=0;i<bs.length;i++){
+  const b=bs[i];kinetic+=b.m*norm(b.v)**2/2;mass+=b.m;weighted=add(weighted,mul(b.p,b.m));angular=add(angular,mul(cross(b.p,b.v),b.m));
+  for(let j=i+1;j<bs.length;j++)potential-=G*b.m*bs[j].m/Math.max(norm(sub(b.p,bs[j].p)),1);
+ }
+ return {energy:kinetic+potential,angular,bary:mul(weighted,1/mass)};
+}
+function rebase(){baseline=diagnostics(bodies)}
+function reset(){
+ playing=false;last=null;carry=0;time=0;steps=0;lastTrail=0;pendingImpact=null;fx=[];replay=null;G=G0*settings.grav;bodies=initial();trails=bodies.map(b=>[[...b.p]]);rebase();renderBodyList();experimentStart=stateSnapshot();history=[];refreshHistory();
+ $("play").textContent="▶";update();drawAll();
+}
+function detectCollision(){
+ for(let i=0;i<bodies.length;i++)for(let j=i+1;j<bodies.length;j++){
+  if(norm(sub(bodies[i].p,bodies[j].p))<=bodies[i].r+bodies[j].r)return [i,j];
+ }return null;
+}
+function merge(i,j){
+ const a=bodies[i],b=bodies[j],m=a.m+b.m;
+ const merged={id:a.id+"+"+b.id,kind:a.m>=b.m?a.kind:b.kind,m,r:Math.cbrt(a.r**3+b.r**3),
+  p:mul(add(mul(a.p,a.m),mul(b.p,b.m)),1/m),
+  v:mul(add(mul(a.v,a.m),mul(b.v,b.m)),1/m)};
+ const mu=a.m*b.m/m,loss=.5*mu*norm(sub(a.v,b.v))**2;
+ bodies.splice(j,1);bodies.splice(i,1,merged);
+ trails.splice(j,1);trails.splice(i,1,[[...merged.p]]);
+ if($("showFx").checked)emitFx(merged.p,"impact",Math.min(70,20+Math.log10(Math.max(loss,1))*1.2));
+ sound("impact");
+ pendingImpact=null;rebase();renderBodyList();recordEvent("Fusão: "+a.id+" + "+b.id);
+ $("launchFeedback").textContent="Fusão: "+a.id+" + "+b.id+". Energia cinética dissipada: "+loss.toExponential(3)+" J.";
+ return loss;
+}
+function impact(pair){
+ const [i,j]=pair;
+ if(collisionMode==="auto"){merge(i,j);return}
+ pendingImpact=pair;playing=false;last=null;$("play").textContent="▶";
+ const a=bodies[i],b=bodies[j],mu=a.m*b.m/(a.m+b.m);
+ const rel=norm(sub(a.v,b.v))/1000,loss=.5*mu*(rel*1000)**2;
+ $("impactInfo").textContent=`${a.id} + ${b.id} | Velocidade relativa ${format(rel,3)} km/s | Energia dissipada ${loss.toExponential(3)} J`;
+ $("impactDialog").style.display="flex";
+}
+function advance(seconds){
+ let left=seconds,dtMax=Number($("dt").value),count=0;
+ while(left>1e-8&&count<2500&&!pendingImpact){
+  const dt=Math.min(left,dtMax);
+  // Passo limitado pela aproximação mais rápida para evitar atravessar corpos sem colisão.
+  let safe=dt;
+  for(let i=0;i<bodies.length;i++)for(let j=i+1;j<bodies.length;j++){
+   const sep=norm(sub(bodies[i].p,bodies[j].p)),relative=norm(sub(bodies[i].v,bodies[j].v));
+   if(relative>0&&sep<20*(bodies[i].r+bodies[j].r))safe=Math.min(safe,Math.max(.01,(sep-bodies[i].r-bodies[j].r)/relative*.2));
+  }
+  const actual=Math.max(.01,safe);
+  verlet(bodies,actual);time+=actual;steps++;count++;left-=actual;
+  const hit=detectCollision();if(hit)impact(hit);
+ }
+ if(time-lastTrail>=Math.max(1800,dtMax)){bodies.forEach((b,i)=>{trails[i].push([...b.p]);if(trails[i].length>1600)trails[i].shift()});lastTrail=time}
+ update();return seconds-left;
+}
+function update(){
+ const earth=bodies.find(b=>b.id==="terra"),moon=bodies.find(b=>b.id==="lua");
+ const d=earth&&moon?norm(sub(moon.p,earth.p)):NaN,v=earth&&moon?norm(sub(moon.v,earth.v)):NaN,x=diagnostics(bodies);
+ $("clock").textContent="Dia "+format(time/DAY,2);
+ $("mDistance").textContent=(Number.isFinite(d)?format(d/1000,0)+" km":"—");$("mVelocity").textContent=Number.isFinite(v)?format(v/1000,3)+" km/s":"—";
+ $("mPeriod").textContent=earth&&moon?format(2*Math.PI*Math.sqrt(settings.distance**3/(G*(earth.m+moon.m)))/DAY,2)+" dias":"—";
+ $("mSteps").textContent=steps.toLocaleString("pt-PT");
+ $("mEnergy").textContent=format((x.energy-baseline.energy)/Math.abs(baseline.energy)*100,8)+" %";
+ $("mAngular").textContent=format(norm(sub(x.angular,baseline.angular))/Math.max(norm(baseline.angular),1)*100,8)+" %";
+ $("mBary").textContent=format(norm(sub(x.bary,baseline.bary)),3)+" m";
+ $("mTime").textContent=format(time/DAY,3)+" dias";
+ $("status").textContent=playing?"● A simular":"● Pausado";
+ $("modeLabel").textContent=editMode==="initial"?"Condições iniciais":"Edição em directo";
+}
+function syncControls(){
+ for(const id of ["earthMass","moonMass","grav"])$(id).value=Math.log10(settings[id]);
+ $("distance").value=settings.distance/1000;$("orbitalSpeed").value=settings.orbitalSpeed;
+ $("autoOrbit").checked=settings.autoOrbit;$("orbitalSpeed").disabled=settings.autoOrbit;
+ $("earthMassValue").textContent=format(settings.earthMass,2)+"×";
+ $("moonMassValue").textContent=format(settings.moonMass,2)+"×";
+ $("gravValue").textContent=format(settings.grav,2)+"×";
+ $("distanceValue").textContent=format(settings.distance/1000,0)+" km";
+ $("orbitalSpeedValue").textContent=format(circularSpeed()*settings.orbitalSpeed/1000,3)+" km/s";
+ $("zoomValue").textContent=format(zoom,2)+"×";
+ $("dtValue").textContent=$("dt").value+" s";
+ $("initialMode").classList.toggle("selected",editMode==="initial");$("liveMode").classList.toggle("selected",editMode==="live");
+ $("editHelp").textContent=editMode==="initial"?"Ajusta os parâmetros: a experiência reinicia na nova configuração.":"Mudanças aplicadas imediatamente; energia e momento angular de referência são recalculados.";
+}
+function changeParam(id){
+ if(activeSystem!=="earthmoon"&&id!=="grav")return;
+ const prev={...settings},oldG=G;
+ if(id==="autoOrbit")settings.autoOrbit=$("autoOrbit").checked;
+ else if(["earthMass","moonMass","grav"].includes(id))settings[id]=10**Number($(id).value);
+ else if(id==="distance")settings.distance=Number($(id).value)*1000;
+ else if(id==="orbitalSpeed")settings.orbitalSpeed=Number($(id).value);
+ if(settings.autoOrbit)settings.orbitalSpeed=1;
+ if(editMode==="initial"){if(activeSystem!=="earthmoon"){systemBodies=clone(bodies)}reset()}
+ else{
+  // Intervenção em directo: massas/G são alterados sem teletransporte dos corpos.
+  // A distância é alterada escalando posições em relação ao baricentro actual.
+  const earth=bodies.find(b=>b.id==="terra"),moon=bodies.find(b=>b.id==="lua");
+  if(activeSystem!=="earthmoon"&&id!=="grav"){Object.assign(settings,prev);G=oldG;syncControls();return}
+  if((!earth||!moon)&&id!=="grav"){$("launchFeedback").textContent="Terra ou Lua já não existe como corpo separado. Reinicia para alterar os parâmetros iniciais.";Object.assign(settings,prev);G=oldG;syncControls();return}
+  const oldRelative=earth&&moon?norm(sub(moon.p,earth.p)):0;
+  if(id==="distance"&&oldRelative>0){
+   const ratio=settings.distance/oldRelative,center=mul(add(mul(earth.p,earth.m),mul(moon.p,moon.m)),1/(earth.m+moon.m));
+   bodies.forEach(b=>b.p=add(center,mul(sub(b.p,center),ratio)));
+  }
+  if(activeSystem==="earthmoon"){earth.m=ME*settings.earthMass;moon.m=MM*settings.moonMass;}G=G0*settings.grav;
+  if(id==="orbitalSpeed"&&earth&&moon){
+   const relative=sub(moon.v,earth.v),n=norm(relative);
+   const direction=n>1e-12?mul(relative,1/n):[0,1,0],newSpeed=circularSpeed()*settings.orbitalSpeed;
+   const total=earth.m+moon.m;
+   earth.v=mul(direction,-newSpeed*moon.m/total);
+   moon.v=mul(direction,newSpeed*earth.m/total);
+  }
+  // Mudanças directas de massa também podem deslocar o baricentro; isso é uma intervenção externa.
+  trails=bodies.map(b=>[[...b.p]]);lastTrail=time;rebase();recordEvent("Alteração: "+id);update();
+ }
+ syncControls();drawAll();
+}
+const catalog=[
+ ["CubeSat",1.3,0.005],["ISS",4.2e5,.055],["Sonda espacial",900,.004],["Explorer One (ficção)",1e6,.05],["Star Cruiser (ficção)",2e8,.2],
+ ["Asteroide 10 m",1.6e6,.005],["Asteroide 100 m",1.6e9,.05],["Asteroide 1 km",1.6e12,.5],["Asteroide 10 km",1.6e15,5],["Asteroide 100 km",1.6e18,50],
+ ["Cometa pequeno",1e11,.5],["Cometa gigante",1e14,5],["Cometa rápido",1e10,.3],
+ ["Ceres",9.3835e20,473],["Plutão",1.303e22,1188.3],["Marte",6.4171e23,3389.5],["Terra",5.972e24,6371],["Júpiter",1.898e27,69911]
+];
+function candidatePosition(){
+ const a=Number($("launchAngle").value)*Math.PI/180,r=Number($("launchDistance").value)*1000;
+ const earth=bodies.find(b=>b.id==="terra");return add(earth?earth.p:[0,0,0],[r*Math.cos(a),r*Math.sin(a),0]);
+}
+function renderBodyList(){
+ const el=$("bodyList");if(!el)return;
+ const select=$("followBody"),value=select.value;select.replaceChildren();
+ const free=document.createElement("option");free.value="";free.textContent="Câmara livre";select.append(free);
+ bodies.forEach(b=>{const opt=document.createElement("option");opt.value=b.id;opt.textContent=b.id;select.append(opt)});
+ select.value=bodies.some(b=>b.id===value)?value:"";followId=select.value;
+ el.textContent=bodies.map(b=>b.id).join(" · ")+" ("+bodies.length+"/32)";
+}
+function launch(){
+ if(pendingImpact){$("launchFeedback").textContent="Resolve primeiro a colisão pendente.";return}
+ if(bodies.length>=32){$("launchFeedback").textContent="Limite de 32 corpos atingido.";return}
+ const m=Number($("launchMass").value),r=Number($("launchRadius").value)*1000;
+ if(!Number.isFinite(m)||m<=0||!Number.isFinite(r)||r<=0){$("launchFeedback").textContent="Massa e raio têm de ser positivos.";return}
+ const p=launchPosition||candidatePosition(),angle=Number($("launchHeading").value)*Math.PI/180,
+ incline=Number($("launchIncline").value)*Math.PI/180,speed=Number($("launchSpeed").value)*1000;
+ const reference=bodies.find(b=>b.id==="terra");
+ const v=add(reference?reference.v:[0,0,0],[speed*Math.cos(incline)*Math.cos(angle),speed*Math.cos(incline)*Math.sin(angle),speed*Math.sin(incline)]);
+ const name=catalog[Number($("catalog").value)][0]+" "+(++bodySeq);
+ if(bodies.some(b=>norm(sub(b.p,p))<b.r+r)){
+  $("launchFeedback").textContent="O ponto escolhido sobrepõe-se a outro corpo. Afasta a posição para lançar.";return;
+ }
+ bodies.push({id:name,m,r,p:[...p],v,kind:Number($("catalog").value)});trails.push([[...p]]);
+ if($("showFx").checked)emitFx(p,"launch",22);sound("launch");launchPosition=null;placing=false;$("launchPreview").style.display="none";$("launchHint").style.display="none";
+ rebase();renderBodyList();update();$("launchFeedback").textContent=name+" lançado. Simulação continua a partir do estado actual.";
+ recordEvent("Lançamento: "+name);const hit=detectCollision();if(hit)impact(hit);
+}
+function setLaunchValues({object=7,distance=550000,angle=45,speed=1,heading=135,incline=0}){
+ $("catalog").value=object;$("catalog").dispatchEvent(new Event("change"));
+ const values={launchDistance:distance,launchAngle:angle,launchSpeed:speed,launchHeading:heading,launchIncline:incline};
+ for(const [id,value] of Object.entries(values)){$(id).value=value;$(id).dispatchEvent(new Event("input"))}
+ launchPosition=null;placing=false;$("launchPreview").style.display="none";$("launchHint").style.display="none";
+}
+const scenarios={
+ orbit:{object:0,distance:10000,angle:0,speed:Math.sqrt(G0*ME/10000000)/1000,heading:90,incline:0,
+  note:"Satélite a 10 000 km do centro da Terra. Velocidade circular aproximada; a Lua pode perturbar a órbita."},
+ flyby:{object:7,distance:450000,angle:-90,speed:3,heading:25,incline:0,
+  note:"Passagem próxima de demonstração. O desvio gravitacional depende das condições e da posição da Lua."},
+ impact:{object:8,distance:150000,angle:0,speed:5,heading:180,incline:0,
+  note:"Asteroide apontado à Terra. A trajectória evolui com a gravidade; o impacto não é garantido."},
+ escape:{object:2,distance:30000,angle:0,speed:6,heading:90,incline:0,
+  note:"Sonda com velocidade inicial elevada; verifica se fica ligada ou escapa do sistema."},
+ lunar:{object:7,distance:300000,angle:0,speed:1,heading:0,incline:0,
+  note:"Aproximação à região lunar. A Lua desloca-se durante o voo; não é uma interceptação garantida."},
+ perturb:{object:17,distance:750000,angle:90,speed:1,heading:180,incline:0,
+  note:"Júpiter perto do sistema Terra–Lua. Experiência extrema que pode exigir passos numéricos menores."}
+};
+function chooseScenario(){
+ const item=scenarios[$("scenario").value];
+ if(!item){$("scenarioHelp").textContent="Personaliza livremente os parâmetros.";return}
+ setLaunchValues(item);$("scenarioHelp").textContent=item.note;
+ $("launchFeedback").textContent="Cenário preparado. Prime Lançar para adicionar o corpo.";
+}
+function setupLaunch(){
+ const groups=[["Satélites e naves",0,5],["Asteróides",5,10],["Cometas",10,13],["Corpos planetários",13,18]];
+ groups.forEach(([name,first,last])=>{const group=document.createElement("optgroup");group.label=name;
+  for(let i=first;i<last;i++){const opt=document.createElement("option");opt.value=i;opt.textContent=catalog[i][0];group.append(opt)}
+  $("catalog").append(group);
+ });
+ $("catalog").onchange=()=>{const c=catalog[Number($("catalog").value)];$("launchMass").value=c[1];$("launchRadius").value=c[2]};
+ $("catalog").dispatchEvent(new Event("change"));
+ $("scenario").addEventListener("change",chooseScenario);
+ for(const id of ["launchDistance","launchAngle","launchSpeed","launchHeading","launchIncline"])$(id).addEventListener("input",()=>{
+  $("launchDistanceValue").textContent=format(Number($("launchDistance").value),0)+" km";
+  $("launchAngleValue").textContent=$("launchAngle").value+"°";
+  $("launchSpeedValue").textContent=format(Number($("launchSpeed").value),1)+" km/s";
+  $("launchHeadingValue").textContent=$("launchHeading").value+"°";
+  $("launchInclineValue").textContent=$("launchIncline").value+"°";
+ });
+ $("launchDistance").dispatchEvent(new Event("input"));
+ $("placeOnMap").onclick=()=>{placing=true;launchPosition=null;$("launchHint").style.display="block";$("launchPreview").style.display="none";$("launchFeedback").textContent="Clica na vista superior e arrasta a seta para definir velocidade e direcção.";setView("xy");togglePanel(false)};
+ $("launchBody").onclick=launch;
+ $("confirmMerge").onclick=()=>{if(!pendingImpact)return;const [i,j]=pendingImpact;merge(i,j);$("impactDialog").style.display="none";collisionMode=$("autoMerge").checked?"auto":"pause";playing=true;last=null;$("play").textContent="Ⅱ"};
+ $("impactReset").onclick=()=>{$("impactDialog").style.display="none";reset()};
+}
+
+function togglePanel(force){
+ const hidden=typeof force==="boolean"?!force:!$("side").classList.contains("hidden");
+ $("side").classList.toggle("hidden",hidden);
+ $("openSide").style.display=hidden?"block":"none";
+}
+function initWindows(){
+ const side=$("side"),stage=$("stage");
+ $("minSide").onclick=()=>togglePanel(false);
+ $("floatSide").onclick=()=>{
+  const floating=side.classList.toggle("docked")===false;
+  if(floating){side.style.left="14px";side.style.top="14px";side.style.height="min(640px, calc(100% - 28px))";side.style.width="355px"}
+  else{side.style.left="";side.style.top="";side.style.height="";side.style.width=""}
+  try{localStorage.setItem("gravity07-floating",floating?"1":"0")}catch(e){}
+ };
+ try{if(localStorage.getItem("gravity07-floating")==="1")$("floatSide").click()}catch(e){}
+ const drag=(handle,windowEl)=>{
+  let start=null;
+  handle.addEventListener("pointerdown",e=>{
+   if(e.target.closest("button")||windowEl.classList.contains("docked")||window.innerWidth<=760)return;
+   const r=windowEl.getBoundingClientRect(),parent=stage.getBoundingClientRect();
+   start={x:e.clientX,y:e.clientY,left:r.left-parent.left,top:r.top-parent.top};
+   handle.setPointerCapture(e.pointerId);e.preventDefault();
+  });
+  handle.addEventListener("pointermove",e=>{
+   if(!start)return;
+   const parent=stage.getBoundingClientRect();
+   windowEl.style.left=Math.max(0,Math.min(parent.width-windowEl.offsetWidth,start.left+e.clientX-start.x))+"px";
+   windowEl.style.top=Math.max(0,Math.min(parent.height-windowEl.offsetHeight,start.top+e.clientY-start.y))+"px";
+   windowEl.style.right="auto";windowEl.style.bottom="auto";
+  });
+  const end=()=>start=null;handle.addEventListener("pointerup",end);handle.addEventListener("pointercancel",end);
+ };
+ drag($("sideHeader"),side);
+ document.querySelectorAll(".mini").forEach(node=>drag(node.querySelector(".label"),node));
+ $("miniRestore").onclick=()=>{document.querySelectorAll(".mini").forEach(node=>node.style.display="");$("miniRestore").style.display="none"};
+ // Miniaturas inicialmente visíveis; painel fechado para dar prioridade à simulação.
+ togglePanel(false);
+}
+
+function setupUI(){
+ ["earthMass","moonMass","distance","orbitalSpeed","grav","autoOrbit"].forEach(id=>$(id).addEventListener("input",()=>changeParam(id)));
+ $("initialMode").onclick=()=>{editMode="initial";reset();syncControls()};
+ $("liveMode").onclick=()=>{editMode="live";syncControls();update()};
+ $("defaults").onclick=()=>{Object.assign(settings,{earthMass:1,moonMass:1,distance:R0,grav:1,orbitalSpeed:1,autoOrbit:true});reset();syncControls()};
+ $("play").onclick=()=>{if(pendingImpact)return;playing=!playing;last=null;$("play").textContent=playing?"Ⅱ":"▶";update()};
+ $("reset").onclick=()=>{reset();syncControls()};
+ $("step").onclick=()=>{if(!playing&&!pendingImpact)advance(3600)};
+ $("dt").oninput=()=>syncControls();
+ $("volume").oninput=()=>$("volumeValue").textContent=$("volume").value+"%";
+ $("soundOn").onchange=()=>{if($("soundOn").checked)sound("enable")};
+ document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("selected",x===b));document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id==="panel-"+b.dataset.tab))});
+ document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+ $("cameraReset").onclick=()=>{yaw=-.65;pitch=.75;pan=[0,0];zoom=1;$("zoom").value=1;syncControls()};
+ $("loadPreset").onclick=()=>loadSystem($("preset").value);
+ $("fitSystem").onclick=fitToSystem;
+ $("snapshotJpg").onclick=snapshotJpg;
+ $("zoom").oninput=()=>{zoom=Number($("zoom").value);syncControls()};
+ $("toggleSide").onclick=$("openSide").onclick=()=>togglePanel();
+ $("followBody").onchange=()=>{followId=$("followBody").value;pan=[0,0]};
+ $("sizeMode").onchange=drawAll;
+ $("showMinis").onchange=()=>{$("miniStack").style.display=$("showMinis").checked?"flex":"none"};
+ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".mini").style.display="none";$("miniRestore").style.display="block"});
+ ["xy","xz"].forEach(v=>{$("mini"+v.toUpperCase()).onclick=()=>setView(v)});
+ const el=$("mainCanvas");let active=new Map(),prev=null,clickStart=null;
+ const pointerToWorld=e=>{
+  const rect=el.getBoundingClientRect(),dpi=Math.min(devicePixelRatio||1,2);
+  const scale=Math.min(el.width,el.height)/(R0*2.75)*zoom*viewScale;
+  const center=followId?(bodies.find(b=>b.id===followId)?.p||[0,0,0]):diagnostics(bodies).bary;return add([((e.clientX-rect.left)*dpi-el.width/2-pan[0]*dpi)/scale,-((e.clientY-rect.top)*dpi-el.height/2-pan[1]*dpi)/scale,0],center);
+ };
+ const finishLaunchDrag=e=>{
+  if(!launchDrag||view!=="xy")return;
+  const q=pointerToWorld(e),d=sub(q,launchDrag.start),distance=norm(d);
+  launchPosition=launchDrag.start;placing=false;launchDrag=null;
+  $("launchHint").style.display="none";$("launchPreview").style.display="none";
+  if(distance>1e6){
+   const heading=Math.atan2(d[1],d[0])*180/Math.PI;
+   // A seta representa o vector velocidade: 30 000 km de arrasto = 1 km/s.
+   $("launchHeading").value=heading;$("launchSpeed").value=Math.min(20,distance/3e7);
+   $("launchHeading").dispatchEvent(new Event("input"));
+  }
+  $("launchFeedback").textContent="Posição e velocidade definidas. Podes ajustar os valores ou lançar.";
+ };
+
+ el.addEventListener("pointerdown",e=>{
+  el.setPointerCapture(e.pointerId);
+  if(placing&&view==="xy"){launchDrag={start:pointerToWorld(e),end:pointerToWorld(e)};return}
+  active.set(e.pointerId,[e.clientX,e.clientY]);clickStart=[e.clientX,e.clientY];prev=null;
+ });
+ el.addEventListener("pointermove",e=>{
+  if(launchDrag){launchDrag.end=pointerToWorld(e);return}
+  if(!active.has(e.pointerId))return;
+  const old=active.get(e.pointerId),dx=e.clientX-old[0],dy=e.clientY-old[1];active.set(e.pointerId,[e.clientX,e.clientY]);
+  if(active.size===1){
+   if(view==="3d"){yaw+=dx*.008;pitch=Math.max(.06,Math.min(Math.PI-.06,pitch+dy*.008))}
+   else{pan[0]+=dx;pan[1]+=dy}
+  }else if(active.size===2){
+   const pts=[...active.values()],distance=Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1]);
+   if(prev!==null&&prev>0){zoom=Math.max(.35,Math.min(5,zoom*distance/prev));$("zoom").value=zoom;syncControls()}prev=distance;
+  }
+ });
+ const end=e=>{if(launchDrag)finishLaunchDrag(e);active.delete(e.pointerId);prev=null};el.addEventListener("pointerup",end);el.addEventListener("pointercancel",end);
+ el.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(.35,Math.min(5,zoom*(e.deltaY>0?.9:1.1)));$("zoom").value=zoom;syncControls()},{passive:false});
+ syncControls();
+}
+function setView(v){
+ if(view===v)return;
+ const old=view;view=v;pan=[0,0];$("viewTitle").textContent=v==="3d"?"VISTA 3D":v==="xy"?"VISTA SUPERIOR XY":"VISTA LATERAL XZ";
+ // As miniaturas mostram sempre as outras duas vistas.
+ const others=["3d","xy","xz"].filter(x=>x!==view);
+ const nodes=[...document.querySelectorAll(".mini")];
+ nodes.forEach((node,i)=>{node.dataset.mini=others[i];node.querySelector(".label").textContent=others[i]==="3d"?"PERSPECTIVA 3D":others[i]==="xy"?"SUPERIOR XY":"LATERAL XZ";
+ node.querySelector("canvas").onclick=()=>setView(node.dataset.mini);
+ node.querySelector("button").onclick=()=>{node.style.display="none";$("miniRestore").style.display="block"};
+ });
+ drawAll();
+}
+function sizeCanvas(canvas){
+ const r=canvas.getBoundingClientRect(),dpi=Math.min(devicePixelRatio||1,2),w=Math.max(1,Math.round(r.width*dpi)),h=Math.max(1,Math.round(r.height*dpi));
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}return {w,h,dpi};
+}
+function project(p,kind,scale,w,h){
+ let x,y,depth=0;
+ if(kind==="xy"){x=p[0];y=p[1]}
+ else if(kind==="xz"){x=p[0];y=p[2]}
+ else{
+  const c=Math.cos(yaw),s=Math.sin(yaw),a=p[0]*c-p[1]*s,b=p[0]*s+p[1]*c;
+  x=a;y=b*Math.cos(pitch)-p[2]*Math.sin(pitch);depth=b*Math.sin(pitch)+p[2]*Math.cos(pitch);
+ }
+ return [w/2+x*scale+(kind===view?pan[0]*Math.min(devicePixelRatio||1,2):0),h/2-y*scale+(kind===view?pan[1]*Math.min(devicePixelRatio||1,2):0),depth];
+}
+// Texturas geradas localmente: não são fotografias nem cartografia científica.
+function seeded(n){let x=(n|0)>>>0;return()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296}}
+const textures={};
+function makeTexture(kind){
+ const c=document.createElement("canvas");c.width=256;c.height=128;const g=c.getContext("2d"),rnd=seeded(kind+1031);
+ const earth=kind===0,moon=kind===1,gas=kind===2;
+ g.fillStyle=earth?"#164b89":moon?"#8c8c91":gas?"#bd936f":"#625a52";g.fillRect(0,0,256,128);
+ if(gas){
+  for(let k=0;k<60;k++){g.fillStyle=["#dfc49d","#9d6750","#f3d8ac","#bd7b60"][k%4];g.globalAlpha=.12+rnd()*.3;g.fillRect(0,rnd()*128,256,1+rnd()*8)}
+ }else{
+  for(let k=0;k<600;k++){
+   const x=rnd()*256,y=rnd()*128,r=1+rnd()*(earth?19:8);
+   if(earth)g.fillStyle=rnd()>.35?"#487c51":"#8f9c70";
+   else g.fillStyle=rnd()>.5?"#d1cfd0":"#62636b";
+   g.globalAlpha=.12+rnd()*.4;g.beginPath();g.ellipse(x,y,r,r*(.2+rnd()*.7),rnd()*6,0,Math.PI*2);g.fill();
+  }
+  if(earth)for(let k=0;k<160;k++){g.globalAlpha=.12+rnd()*.2;g.fillStyle="#ffffff";g.beginPath();g.ellipse(rnd()*256,rnd()*128,2+rnd()*22,1+rnd()*3,rnd()*6,0,Math.PI*2);g.fill()}
+ }
+ g.globalAlpha=1;return c;
+}
+
+function bodyPixelRadius(b,scale,dpi,isMain){
+ const mode=$("sizeMode").value;
+ const physical=Math.max(0,b.r*scale);
+ if(mode==="real")return Math.max(.5*dpi,physical);
+ // Em escalas astronómicas, o Sol pode ocupar todo o Canvas.
+ // A dimensão visual é limitada apenas nos modos ilustrativos;
+ // a esfera física e a detecção de colisões mantêm o raio verdadeiro.
+ const min=(isMain?3.5:2.5)*dpi;
+ const cap=(isMain?34:14)*dpi;
+ const relative=Math.sqrt(Math.max(0,b.r)/6371000);
+ if(mode==="cinema"){
+  const illustrated=Math.max(physical, (isMain?13:8)*dpi*relative);
+  return Math.max(min,Math.min(cap,illustrated));
+ }
+ const illustrated=Math.max(physical,(isMain?9:6)*dpi*relative);
+ return Math.max(min,Math.min(cap,illustrated));
+}
+function drawSpacecraft(ctx,b,x,y,r,category,dpi){
+ const a=Math.atan2(b.v[1],b.v[0]);const u=Math.max(r,category>=3?8*dpi:5*dpi);
+ ctx.save();ctx.translate(x,y);ctx.rotate(-a);ctx.scale(u/12,u/12);
+ ctx.shadowColor="#44cfff";ctx.shadowBlur=7;
+ if(category===0||category===1){
+  ctx.fillStyle="#285a8b";ctx.fillRect(-25,-7,17,14);ctx.fillRect(8,-7,17,14);
+  ctx.strokeStyle="#89d8ff";for(let i=-23;i<=23;i+=5){ctx.beginPath();ctx.moveTo(i,-7);ctx.lineTo(i,7);ctx.stroke()}
+  ctx.fillStyle="#e7edf6";ctx.fillRect(-8,-5,16,10);ctx.fillStyle="#ffbd69";ctx.fillRect(-3,-3,6,6);
+ }else if(category===2){
+  ctx.fillStyle="#c9e5ed";ctx.beginPath();ctx.moveTo(13,0);ctx.lineTo(-8,-6);ctx.lineTo(-8,6);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="#a7d7ef";ctx.beginPath();ctx.ellipse(-11,0,8,4,0,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle="#4c88b9";ctx.fillRect(-4,-14,7,9);ctx.fillRect(-4,5,7,9);
+ }else{
+  ctx.fillStyle=category===3?"#8bb9d3":"#b0c3db";ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(1,-6);ctx.lineTo(-12,-13);ctx.lineTo(-8,-3);ctx.lineTo(-17,0);ctx.lineTo(-8,3);ctx.lineTo(-12,13);ctx.lineTo(1,6);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="#ecfaff";ctx.lineWidth=.8;ctx.stroke();ctx.fillStyle="#49c8f3";ctx.fillRect(-13,-3,5,6);ctx.fillStyle="#25496d";ctx.fillRect(4,-2,7,4);
+  ctx.fillStyle="#4bdcff";ctx.beginPath();ctx.moveTo(-17,-3);ctx.lineTo(-24,0);ctx.lineTo(-17,3);ctx.fill();
+ }
+ ctx.restore();
+}
+function drawCometTail(ctx,b,x,y,r,dpi){
+ // Sem Sol na v0.7: direcção da cauda definida por iluminação convencional vinda de +X.
+ const length=Math.max(22*dpi,r*9),angle=Math.PI;
+ ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+ for(const [color,width,offset] of [["#7cd8ff",r*.75,0],["#f4d6a0",r*1.5,.3]]){
+  const g=ctx.createLinearGradient(0,0,length,0);g.addColorStop(0,color+"bb");g.addColorStop(1,color+"00");
+  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(0,-width);ctx.quadraticCurveTo(length*.5,-width*(1+offset),length,0);ctx.quadraticCurveTo(length*.5,width*(1+offset),0,width);ctx.fill();
+ }ctx.restore();
+}
+function drawRings(ctx,x,y,r,dpi,planet){
+ const faint=planet!=="saturno";
+ ctx.save();ctx.translate(x,y);ctx.rotate(-.3);ctx.scale(1,.35);ctx.globalAlpha=faint?.32:1;
+ for(let j=0;j<4;j++){ctx.strokeStyle=["#b5a47c88","#e2d0a6aa","#806e5b88","#d4c7a788"][j];ctx.lineWidth=(1.5+j*.3)*dpi;ctx.beginPath();ctx.ellipse(0,0,r*(1.35+j*.16),r*(1.35+j*.16),0,0,Math.PI*2);ctx.stroke()}
+ ctx.restore();
+}
+
+function drawBody(ctx,b,x,y,r,i,scale,dpi,t){
+ const isEarth=b.id==="terra",isMoon=b.id==="lua";
+ const category=b.kind===undefined?-1:b.kind;
+ if(category>=0&&category<=4){drawSpacecraft(ctx,b,x,y,r,category,dpi);return}
+ if(category>=10&&category<=12)drawCometTail(ctx,b,x,y,r,dpi);
+ const gas=category===17||b.id==="jupiter"||b.id==="saturno",kind=isEarth?0:isMoon?1:gas?2:3;
+ if(!textures[kind])textures[kind]=makeTexture(kind);
+ if(isEarth){ctx.beginPath();ctx.arc(x,y,r+3*dpi,0,Math.PI*2);ctx.fillStyle="#2d9cff25";ctx.fill()}
+ ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();
+ // Longitudinal strip creates a modest impression of rotation.
+ const shift=((t/(isEarth?86400:isMoon?27.3*86400:86400))*24)%256;
+ ctx.drawImage(textures[kind],x-r-shift*r/128,y-r,r*4,r*2);
+ const shade=ctx.createRadialGradient(x-r*.35,y-r*.35,r*.1,x+r*.25,y+r*.15,r*1.5);
+ shade.addColorStop(0,"#ffffff18");shade.addColorStop(.55,"#00000010");shade.addColorStop(1,"#000000c9");
+ ctx.fillStyle=shade;ctx.fillRect(x-r,y-r,2*r,2*r);ctx.restore();
+ ctx.strokeStyle=isEarth?"#80cfff77":"#d6e5ff33";ctx.lineWidth=dpi*.6;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+ if(["saturno","jupiter","urano","neptuno"].includes(b.id))drawRings(ctx,x,y,r,dpi,b.id);
+}
+function emitFx(position,type,count){
+ const rnd=seeded((steps+1)*47+count),life=type==="impact"?2.2:1.4;
+ for(let i=0;i<count;i++){
+  const a=rnd()*Math.PI*2,v=(.2+rnd())*R0*.14;
+  fx.push({p:[...position],vel:[Math.cos(a)*v,Math.sin(a)*v,0],age:0,life,color:type==="impact"?"#ffb56a":"#75dfff"});
+ }
+ if(fx.length>300)fx=fx.slice(-300);
+}
+function renderFx(ctx,projectPoint,dpi){
+ for(const particle of fx){
+  const q=add(particle.p,mul(particle.vel,particle.age)),[x,y]=projectPoint(q);
+  ctx.globalAlpha=Math.max(0,1-particle.age/particle.life);
+  ctx.fillStyle=particle.color;ctx.beginPath();ctx.arc(x,y,(1.3+2*(1-particle.age/particle.life))*dpi,0,Math.PI*2);ctx.fill();
+ }ctx.globalAlpha=1;
+}
+function sound(type){
+ if(!$("soundOn").checked)return;
+ try{
+  audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();
+  if(audioContext.state==="suspended")audioContext.resume();
+  const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),now=audioContext.currentTime;
+  const volume=Number($("volume").value)/100;
+  oscillator.type=type==="impact"?"sawtooth":"sine";
+  oscillator.frequency.setValueAtTime(type==="impact"?180:420,now);
+  oscillator.frequency.exponentialRampToValueAtTime(type==="impact"?45:120,now+.32);
+  gain.gain.setValueAtTime(Math.max(.0001,volume*.11),now);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+.38);
+  oscillator.connect(gain).connect(audioContext.destination);oscillator.start(now);oscillator.stop(now+.4);
+ }catch(e){$("soundOn").checked=false}
+}
+function render(canvas,kind){
+ const {w,h,dpi}=sizeCanvas(canvas),ctx=canvas.getContext("2d");ctx.clearRect(0,0,w,h);
+ const isMain=canvas.id==="mainCanvas",scale=Math.min(w,h)/(R0*2.75)*zoom*viewScale;
+ const target=followId?bodies.find(b=>b.id===followId):null;
+ const bary=diagnostics(bodies).bary;
+ const center=target?target.p:bary;
+ const projectPoint=p=>project(sub(p,center),kind,scale,w,h);
+ if($("showGrid").checked){
+  // A grelha cobre o sistema completo, não apenas o sistema Terra-Lua.
+  // Intervalo adaptativo (1/2/5 × 10^n) para evitar milhares de linhas.
+  let extent=R0;
+  for(const body of bodies){
+   const q=sub(body.p,center);
+   extent=Math.max(extent,Math.abs(q[0])+body.r,Math.abs(q[1])+body.r,Math.abs(q[2])+body.r);
+  }
+  for(const path of trails){if(path.length){const q=sub(path[path.length-1],center);extent=Math.max(extent,Math.abs(q[0]),Math.abs(q[1]))}}
+  const gridHalf=extent*1.25;
+  const desiredStep=gridHalf/5;
+  const magnitude=10**Math.floor(Math.log10(Math.max(desiredStep,1)));
+  const factor=[1,2,5,10].find(n=>n*magnitude>=desiredStep)||10;
+  const gridStep=factor*magnitude;
+  const count=Math.min(14,Math.ceil(gridHalf/gridStep));
+  const edge=Math.max(gridHalf,gridStep*count);
+  ctx.strokeStyle="#21446377";ctx.lineWidth=dpi;
+  for(let k=-count;k<=count;k++){
+   const d=k*gridStep;
+   const a=projectPoint([d,-edge,0]),b=projectPoint([d,edge,0]);
+   const c=projectPoint([-edge,d,0]),e=projectPoint([edge,d,0]);
+   ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.moveTo(...c);ctx.lineTo(...e);ctx.stroke();
+  }
+ }
+ if($("showTrails").checked)trails.forEach((path,i)=>{
+  ctx.beginPath();path.forEach((p,j)=>{const [x,y]=projectPoint(p);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+  ctx.strokeStyle=i===0?"#3685c8":i===1?"#a6b8cb":"#d2a65e";ctx.lineWidth=(isMain?1.6:1)*dpi;ctx.stroke();
+ });
+ const dots=bodies.map((b,i)=>({b,i,p:projectPoint(b.p)})).sort((a,b)=>a.p[2]-b.p[2]);
+ dots.forEach(({b,i,p})=>{
+  const [x,y]=p,r=bodyPixelRadius(b,scale,dpi,isMain);
+  if($("realistic").checked)drawBody(ctx,b,x,y,r,i,scale,dpi,time);
+  else{
+   const grad=ctx.createRadialGradient(x-r*.4,y-r*.4,0,x,y,r);
+   if(b.id==="terra"){grad.addColorStop(0,"#a9e6ff");grad.addColorStop(.5,"#408bce");grad.addColorStop(1,"#072744")}
+   else{grad.addColorStop(0,"#ffffff");grad.addColorStop(.6,"#b5bdc9");grad.addColorStop(1,"#465468")}
+   ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+  }
+  if(isMain){ctx.fillStyle="#d8eaff";ctx.font=`${12*dpi}px system-ui`;ctx.fillText(b.id==="terra"?"TERRA":b.id==="lua"?"LUA":b.id,x+r+6*dpi,y)}
+  if(isMain&&$("showVectors").checked){
+   const vector=mul(b.v,DAY*.35),end=projectPoint(add(b.p,vector));ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(end[0],end[1]);ctx.strokeStyle="#f6b56b";ctx.lineWidth=2*dpi;ctx.stroke();
+  }
+ });
+ if(isMain&&$("showFx").checked)renderFx(ctx,projectPoint,dpi);
+ if($("showBary").checked){const [bx,by]=projectPoint(bary);ctx.strokeStyle="#ffd67e";ctx.lineWidth=1.5*dpi;ctx.beginPath();ctx.moveTo(bx-6*dpi,by);ctx.lineTo(bx+6*dpi,by);ctx.moveTo(bx,by-6*dpi);ctx.lineTo(bx,by+6*dpi);ctx.stroke();if(isMain){ctx.fillStyle="#ffd67e";ctx.font=`${10*dpi}px system-ui`;ctx.fillText("BARICENTRO",bx+9*dpi,by-9*dpi)}}
+ if(isMain&&(placing||launchPosition||launchDrag)){const q=launchDrag?launchDrag.start:launchPosition||candidatePosition(),[px,py]=projectPoint(q);ctx.strokeStyle="#fbbf75";ctx.lineWidth=2*dpi;ctx.beginPath();ctx.arc(px,py,9*dpi,0,Math.PI*2);ctx.moveTo(px-14*dpi,py);ctx.lineTo(px+14*dpi,py);ctx.moveTo(px,py-14*dpi);ctx.lineTo(px,py+14*dpi);ctx.stroke();
+  if(launchDrag){const [ex,ey]=projectPoint(launchDrag.end);ctx.strokeStyle="#ffa95b";ctx.lineWidth=3*dpi;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex,ey);ctx.stroke();const a=Math.atan2(ey-py,ex-px);ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-12*dpi*Math.cos(a-.5),ey-12*dpi*Math.sin(a-.5));ctx.lineTo(ex-12*dpi*Math.cos(a+.5),ey-12*dpi*Math.sin(a+.5));ctx.closePath();ctx.fillStyle="#ffa95b";ctx.fill();}
+ }
+
+}
+function drawAll(){
+ render($("mainCanvas"),view);
+ const other=["3d","xy","xz"].filter(v=>v!==view);
+ document.querySelectorAll(".mini").forEach((node,i)=>{if(node.style.display!=="none")render(node.querySelector("canvas"),node.dataset.mini||other[i])});
+}
+function frame(ts){
+ // Efeitos visuais usam tempo real, independentemente do relógio da física.
+ if(window._fxLast!==undefined){const delta=Math.min((ts-window._fxLast)/1000,.1);fx=fx.filter(p=>(p.age+=delta)<p.life)}
+ window._fxLast=ts;
+ if(playing){
+  if(last!==null){
+   carry+=Math.min((ts-last)/1000,.1)*Number($("speed").value);
+   const requested=Math.min(carry,DAY*2);
+   if(requested>0){
+    if(replay){
+     let remaining=requested;
+     while(remaining>1e-8&&replay){
+      const event=replay.events[replay.index],until=event?Math.max(0,event.t-time):remaining;
+      if(event&&until<=1e-6){applySnapshot(event.state);replay.index++;continue}
+      const done=advance(Math.min(remaining,until));remaining-=done;
+      if(done<=0)break;
+     }
+     carry=Math.max(0,carry-(requested-remaining));
+     if(replay&&time>=replay.endTime-1e-5){playing=false;replay=null;$("play").textContent="▶";$("libraryStatus").textContent="Reprodução concluída."}
+    }else carry-=advance(requested);
+   }
+  }last=ts;
+ }else last=null;
+ drawAll();requestAnimationFrame(frame);
+}
+
+// Experiências: snapshots versionados e eventos físicos, persistidos em IndexedDB.
+function stateSnapshot(){return {t:time,steps,G,settings:clone(settings),bodies:clone(bodies),trails:clone(trails),lastTrail,collisionMode,activeSystem,viewScale}}
+function applySnapshot(snap){
+ time=snap.t;steps=snap.steps;G=snap.G;activeSystem=snap.activeSystem||"earthmoon";viewScale=snap.viewScale||1;Object.assign(settings,clone(snap.settings));bodies=clone(snap.bodies);
+ trails=clone(snap.trails||bodies.map(b=>[[...b.p]]));lastTrail=snap.lastTrail??time;
+ collisionMode=snap.collisionMode||"pause";systemBodies=activeSystem==="earthmoon"?null:clone(snap.bodies);pendingImpact=null;fx=[];rebase();renderBodyList();syncControls();update();
+}
+function recordEvent(label){
+ if(replay)return;
+ history.push({t:time,label,state:stateSnapshot()});if(history.length>250)history.shift();refreshHistory();
+}
+function refreshHistory(){const el=$("eventLog");if(el)el.textContent=history.length?history.slice(-20).map(e=>"Dia "+format(e.t/DAY,3)+" · "+e.label).join("\n"):"Sem intervenções."}
+function dbOpen(){return new Promise((resolve,reject)=>{const req=indexedDB.open("gravity-lab-experiments",1);
+ req.onupgradeneeded=()=>req.result.createObjectStore("records",{keyPath:"id"});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function dbOperation(mode,operation){const db=await dbOpen();try{return await new Promise((resolve,reject)=>{const tx=db.transaction("records",mode),store=tx.objectStore("records");const req=operation(store);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tx.onabort=()=>reject(tx.error)})}finally{db.close()}}
+const records=()=>dbOperation("readonly",store=>store.getAll());
+function validRecord(v){return v&&v.version===1&&typeof v.name==="string"&&v.name.length<=90&&["experiment","checkpoint"].includes(v.type)&&v.start&&Array.isArray(v.start.bodies)&&v.start.bodies.length<=32&&v.start.bodies.every(b=>Number.isFinite(b.m)&&b.m>0&&Number.isFinite(b.r)&&b.r>0&&Array.isArray(b.p)&&b.p.length===3&&b.p.every(Number.isFinite)&&Array.isArray(b.v)&&b.v.length===3&&b.v.every(Number.isFinite))&&Array.isArray(v.events)&&v.events.length<=250}
+async function saveRecord(type){
+ const name=$("saveName").value.trim()||("Experiência "+new Date().toLocaleString("pt-PT"));
+ const rec={id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random(),version:1,name,type,created:new Date().toISOString(),start:type==="experiment"?clone(experimentStart):stateSnapshot(),events:type==="experiment"?clone(history):[],endTime:time};
+ try{await dbOperation("readwrite",store=>store.put(rec));$("libraryStatus").textContent="Guardado: "+name;await renderLibrary()}catch(e){$("libraryStatus").textContent="Não foi possível guardar: "+e.message}
+}
+async function renderLibrary(){
+ try{const list=(await records()).sort((a,b)=>b.created.localeCompare(a.created));const root=$("savedList");root.replaceChildren();
+  for(const rec of list){const item=document.createElement("div");item.className="savedItem";
+   const title=document.createElement("strong");title.textContent=rec.name;item.append(title);
+   const info=document.createElement("small");info.textContent=(rec.type==="experiment"?"Experiência":"Ponto de controlo")+" · "+new Date(rec.created).toLocaleString("pt-PT")+" · "+format(rec.endTime/DAY,2)+" dias";item.append(info);
+   const actions=document.createElement("div");actions.className="row";
+   const load=document.createElement("button");load.textContent=rec.type==="experiment"?"Reproduzir":"Continuar";load.onclick=()=>loadRecord(rec);
+   const remove=document.createElement("button");remove.textContent="Eliminar";remove.onclick=async()=>{if(!confirm("Eliminar esta experiência?"))return;await dbOperation("readwrite",store=>store.delete(rec.id));renderLibrary()};
+   actions.append(load,remove);item.append(actions);root.append(item)
+  }
+  if(!list.length)root.textContent="Ainda não tens experiências guardadas.";
+ }catch(e){$("libraryStatus").textContent="IndexedDB indisponível: "+e.message}
+}
+function loadRecord(rec){
+ if(!validRecord(rec)){ $("libraryStatus").textContent="Ficheiro ou registo inválido.";return}
+ playing=false;last=null;carry=0;$("play").textContent="▶";applySnapshot(rec.start);
+ history=rec.type==="experiment"?clone(rec.events):[];experimentStart=clone(rec.start);refreshHistory();
+ if(rec.type==="experiment"){
+  replay={events:clone(rec.events).sort((a,b)=>a.t-b.t),index:0,endTime:rec.endTime};
+  if(replay.endTime>time){playing=true;$("play").textContent="Ⅱ"}else replay=null;
+ }
+ editMode="live";syncControls();update();$("libraryStatus").textContent=rec.type==="experiment"?"A reproduzir: "+rec.name:"Estado restaurado: "+rec.name;
+}
+async function exportRecords(){try{const data={format:"GravityLab",version:1,records:await records()};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gravity-lab-experiencias.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch(e){$("libraryStatus").textContent=e.message}}
+async function importRecords(file){try{if(file.size>5e6)throw Error("Ficheiro demasiado grande (máx. 5 MB)");const data=JSON.parse(await file.text());if(data.format!=="GravityLab"||data.version!==1||!Array.isArray(data.records)||data.records.length>200)throw Error("Formato não reconhecido");
+ let count=0;for(const rec of data.records){if(!validRecord(rec))continue;rec.id=crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random();await dbOperation("readwrite",store=>store.put(rec));count++}
+ $("libraryStatus").textContent=count+" experiências importadas.";renderLibrary();}catch(e){$("libraryStatus").textContent="Erro de importação: "+e.message}}
+function setupLibrary(){
+ $("saveExperiment").onclick=()=>saveRecord("experiment");$("saveCheckpoint").onclick=()=>saveRecord("checkpoint");
+ $("exportExperiments").onclick=exportRecords;$("importExperiments").onclick=()=>$("importFile").click();
+ $("importFile").onchange=e=>{if(e.target.files[0])importRecords(e.target.files[0]);e.target.value=""};renderLibrary();
+}
+
+window.GravityLabPhysics={initial,accelerations,verlet,diagnostics};
+setupUI();setupLaunch();initWindows();reset();setupLibrary();setView("3d");requestAnimationFrame(frame);
+</script></body></html>
